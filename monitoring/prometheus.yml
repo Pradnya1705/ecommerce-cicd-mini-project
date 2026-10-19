@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: 'ecommerce'
+    metrics_path: /actuator/prometheus
+    static_configs:
+      # Replace this with a reachable address for your cluster/network.
+      - targets: ['host.docker.internal:30080']
