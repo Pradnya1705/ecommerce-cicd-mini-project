@@ -3,7 +3,7 @@ pipeline {
   tools { jdk 'jdk17'; maven 'maven3' }
   environment {
     SONAR_HOST_URL = 'http://sonarqube:9000'
-    IMAGE_NAME = 'YOUR_DOCKERHUB_USERNAME/ecommerce-store'
+    IMAGE_NAME = 'pradnya2005/ecommerce-store'
     K8S_NAMESPACE = 'default'
   }
   stages {
@@ -11,7 +11,7 @@ pipeline {
       steps { checkout scm }
     }
     stage('Build and Test') {
-      steps { sh 'mvn -B clean verify' }
+      steps { bat 'mvn -B clean verify' }
       post { always { junit 'target/surefire-reports/*.xml' } }
     }
     stage('SonarQube Analysis') {
@@ -32,16 +32,25 @@ pipeline {
       steps { sh 'docker build -t $IMAGE_NAME:$BUILD_NUMBER .' }
     }
     stage('Push Docker Image') {
-      steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-          sh '''
-            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-            docker push "$IMAGE_NAME:$BUILD_NUMBER"
-            docker logout
-          '''
+    steps {
+        withCredentials([
+            usernamePassword(
+                credentialsId: 'dockerhub-creds',
+                usernameVariable: 'DOCKER_USER',
+                passwordVariable: 'DOCKER_PASS'
+            )
+        ]) {
+            bat '''
+                @echo off
+                docker login -u "%DOCKER_USER%" -p "%DOCKER_PASS%"
+                if errorlevel 1 exit /b 1
+                docker push "%IMAGE_NAME%:%BUILD_NUMBER%"
+                if errorlevel 1 exit /b 1
+                docker logout
+            '''
         }
-      }
     }
+}
     stage('Deploy to Kubernetes') {
       steps {
         withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
