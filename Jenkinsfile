@@ -17,7 +17,7 @@ pipeline {
     stage('SonarQube Analysis') {
       steps {
         withSonarQubeEnv('SonarQube') {
-          sh 'mvn -B sonar:sonar -Dsonar.projectKey=ecommerce-store'
+          bat 'mvn -B sonar:sonar -Dsonar.projectKey=ecommerce-store'
         }
       }
     }
