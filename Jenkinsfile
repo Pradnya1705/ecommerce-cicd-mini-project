@@ -1,111 +1,72 @@
-
 pipeline {
-    agent any
-
-    tools {
-        jdk 'jdk17'
-        maven 'maven3'
+  agent any
+  tools { jdk 'jdk17'; maven 'maven3' }
+  environment {
+    SONAR_HOST_URL = 'http://sonarqube:9000'
+    IMAGE_NAME = 'pradnya2005/ecommerce-store'
+    K8S_NAMESPACE = 'default'
+  }
+  stages {
+    stage('Checkout') {
+      steps { checkout scm }
     }
-
-    environment {
-        IMAGE_NAME = 'pradnya2005/ecommerce-store'
-        K8S_NAMESPACE = 'default'
+    stage('Build and Test') {
+      steps { bat 'mvn -B clean verify' }
+      post { always { junit 'target/surefire-reports/*.xml' } }
     }
-
-    stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
+    stage('SonarQube Analysis') {
+      steps {
+        withSonarQubeEnv('SonarQube') {
+          bat 'mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar -Dsonar.projectKey=ecommerce-store'
+          
         }
-
-        stage('Build and Test') {
-            steps {
-                bat 'mvn -B clean verify'
-            }
-            post {
-                always {
-                    junit 'target/surefire-reports/*.xml'
-                }
-            }
+      }
+    }
+    stage('Quality Gate') {
+      steps {
+        timeout(time: 5, unit: 'MINUTES') {
+          waitForQualityGate abortPipeline: true
         }
-
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('SonarQube') {
-                    bat 'mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar -Dsonar.projectKey=ecommerce-store'
-                }
-            }
-        }
-
-        stage('Quality Gate') {
-            steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                bat 'docker version'
-                bat 'docker build -t %IMAGE_NAME%:%BUILD_NUMBER% .'
-            }
-        }
-
-        stage('Push Docker Image') {
-            steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-creds',
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
-                    )
-                ]) {
-                    bat '''
-                        @echo off
-                        echo Logging in to Docker Hub...
-                        echo %DOCKER_PASS% | docker login -u "%DOCKER_USER%" --password-stdin
-                        if errorlevel 1 exit /b 1
-
-                        docker push "%IMAGE_NAME%:%BUILD_NUMBER%"
-                        if errorlevel 1 exit /b 1
-
-                        docker logout
-                    '''
-                }
-            }
-        }
-
-        stage('Deploy to Kubernetes') {
-            steps {
-                withCredentials([
-                    file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')
-                ]) {
-                    bat '''
-                        @echo off
-                        set "KUBECONFIG=%KUBECONFIG_FILE%"
-
-                        kubectl config current-context
-                        if errorlevel 1 exit /b 1
-
-                        kubectl set image deployment/ecommerce ecommerce=%IMAGE_NAME%:%BUILD_NUMBER% -n %K8S_NAMESPACE%
-                        if errorlevel 1 exit /b 1
-
-                        kubectl rollout status deployment/ecommerce -n %K8S_NAMESPACE% --timeout=120s
-                        if errorlevel 1 exit /b 1
-                    '''
-                }
-            }
+      }
+    }
+    stage('Build Docker Image') {
+      steps { sh 'docker build -t $IMAGE_NAME:$BUILD_NUMBER .' }
+    }
+    stage('Push Docker Image') {
+    steps {
+        withCredentials([
+            usernamePassword(
+                credentialsId: 'dockerhub-creds',
+                usernameVariable: 'DOCKER_USER',
+                passwordVariable: 'DOCKER_PASS'
+            )
+        ]) {
+            bat '''
+                @echo off
+                docker login -u "%DOCKER_USER%" -p "%DOCKER_PASS%"
+                if errorlevel 1 exit /b 1
+                docker push "%IMAGE_NAME%:%BUILD_NUMBER%"
+                if errorlevel 1 exit /b 1
+                docker logout
+            '''
         }
     }
-
-    post {
-        success {
-            echo 'Pipeline passed: quality gate approved and deployment completed.'
+}
+    stage('Deploy to Kubernetes') {
+      steps {
+        withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+          sh '''
+            export KUBECONFIG="$KUBECONFIG_FILE"
+            sed "s|IMAGE_PLACEHOLDER|$IMAGE_NAME:$BUILD_NUMBER|g" k8s/deployment.yaml | kubectl apply -f -
+            kubectl apply -f k8s/service.yaml
+            kubectl rollout status deployment/ecommerce --timeout=120s
+          '''
         }
-        failure {
-            echo 'Pipeline failed. Check Console Output for the first failed stage.'
-        }
+      }
     }
+  }
+  post {
+    success { echo 'Pipeline passed: quality gate approved and deployment completed.' }
+    failure { echo 'Pipeline failed. Review the failed stage; deployment does not proceed after a failed quality gate.' }
+  }
 }
