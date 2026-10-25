@@ -45,13 +45,13 @@ pipeline {
                 }
             }
         }
-
         stage('Build Docker Image') {
-            steps {
-                bat 'docker version'
-                bat 'docker build -t %IMAGE_NAME%:%BUILD_NUMBER% .'
-            }
-        }
+    steps {
+        bat 'docker build -t %IMAGE_NAME%:%BUILD_NUMBER% .'
+    }
+}
+
+       
 
         stage('Push Docker Image') {
             steps {
