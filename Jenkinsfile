@@ -58,31 +58,26 @@ stage('Build Docker Image') {
 }
 
 
-       
 
-        stage('Push Docker Image') {
-            steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-creds',
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
-                    )
-                ]) {
-                    bat '''
-                        @echo off
-                        echo Logging in to Docker Hub...
-                        echo %DOCKER_PASS% | docker login -u "%DOCKER_USER%" --password-stdin
-                        if errorlevel 1 exit /b 1
+stage('Push Docker Image') {
+    steps {
+        withCredentials([usernamePassword(
+            credentialsId: 'dockerhub-creds',
+            usernameVariable: 'DOCKER_USER',
+            passwordVariable: 'DOCKER_PASS'
+        )]) {
+            bat '''
+                echo %DOCKER_PASS% | "C:\\Users\\Pradnya\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe" login -u "%DOCKER_USER%" --password-stdin
+                if errorlevel 1 exit /b 1
 
-                        docker push "%IMAGE_NAME%:%BUILD_NUMBER%"
-                        if errorlevel 1 exit /b 1
-
-                        docker logout
-                    '''
-                }
-            }
+                "C:\\Users\\Pradnya\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe" push "%IMAGE_NAME%:%BUILD_NUMBER%"
+                if errorlevel 1 exit /b 1
+            '''
         }
+    }
+}
+
+
 
         stage('Deploy to Kubernetes') {
             steps {
