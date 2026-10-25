@@ -45,11 +45,18 @@ pipeline {
                 }
             }
         }
-        stage('Build Docker Image') {
+ 
+stage('Build Docker Image') {
     steps {
-        bat 'docker build -t %IMAGE_NAME%:%BUILD_NUMBER% .'
+        bat '''
+            "C:\\Users\\Pradnya\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe" version
+            if errorlevel 1 exit /b 1
+            "C:\\Users\\Pradnya\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe" build -t "%IMAGE_NAME%:%BUILD_NUMBER%" .
+            if errorlevel 1 exit /b 1
+        '''
     }
 }
+
 
        
 
