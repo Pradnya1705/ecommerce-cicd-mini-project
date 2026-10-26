@@ -90,16 +90,17 @@ stage('Build Docker Image') {
                     file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')
                 ]) {
                     bat '''
-                        @echo off
+                        
                         set "KUBECONFIG=%KUBECONFIG_FILE%"
+                        set "KUBECTL=C:\\Users\\Pradnya\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\kubectl.exe"
 
-                        kubectl config current-context
+                        "%KUBECTL%" config current-context
                         if errorlevel 1 exit /b 1
 
-                        kubectl set image deployment/ecommerce ecommerce=%IMAGE_NAME%:%BUILD_NUMBER% -n %K8S_NAMESPACE%
+                        "%KUBECTL%" set image deployment/ecommerce ecommerce=%IMAGE_NAME%:%BUILD_NUMBER% -n %K8S_NAMESPACE%
                         if errorlevel 1 exit /b 1
 
-                        kubectl rollout status deployment/ecommerce -n %K8S_NAMESPACE% --timeout=120s
+                        "%KUBECTL%" rollout status deployment/ecommerce -n %K8S_NAMESPACE% --timeout=120s
                         if errorlevel 1 exit /b 1
                     '''
                 }
